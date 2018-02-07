@@ -1,0 +1,109 @@
+<?php
+
+class InputfieldExportFiles extends WireData implements Module, ConfigurableModule {
+    
+    static public function getDefaultConfig() {
+        return array(
+            "includeFields" => ''
+        );
+    }
+
+    public static function install(){
+        $session = wire("session");
+        if(!class_exists('\ZipArchive')){
+            throw new WireException("ZipArchive is required to create the zip file");
+        }
+    }
+    
+    public static function getModuleInfo() {
+        return array(
+            'title' => 'ExportFieldImages',
+            'version' => 0.1, 
+            'summary' => "Adds a button bellow images field to download a zip containing files.",
+            'author' => 'Eduardo San Miguel Garcia',
+            'singular' => true,
+            'href' => '',
+            'autoload' => true
+        );
+    }
+
+    public function init() {
+        $this->addHookAfter('InputfieldImage::render', $this, 'afterInputfieldImageRender');
+        $this->addHookAfter("ProcessPageEdit::execute", $this, "pageEditExecuteBefore");
+    }
+
+    public function pageEditExecuteBefore(HookEvent $event){
+        $session = wire("session");
+        $input = wire("input");
+        $page = wire('pages')->get($input->get->id);
+        $name = $page->name;
+        $zip = $config->paths->cache . "${$name}.zip";
+        
+        if($input->get->downloadImages == "true"){
+            wire("log")->save("custom", "excecuted page edit!");
+            $array = wire('files')->zip($zip,
+                                        $page->get($input->get->field)->explode("filename"),
+                                        array("overwrite" => true)  );
+            if(!empty($array["errors"])){
+                foreach($array["errors"] as $error){
+                    $this->error($error);
+                }
+                return;
+            } else{
+                header('Content-Type: application/zip');
+                header("Content-Disposition: attachment; filename='{$name}.zip'");
+                echo readfile($zip);
+                return $this->halt();
+            }
+            
+        }
+    }
+    
+    public function afterInputfieldImageRender(HookEvent $event){
+        $field = $event->object;
+        $input = wire("input");
+        $configData = wire('modules')->getModuleConfigData($this);
+      
+        $out = $event->return;
+        
+        if(in_array( $field->name, $configData['includeFields'])){
+
+            $button = wire('modules')->get('InputfieldButton');
+            $button->class = $button->class . " ExportFieldImages";
+            $button->icon = 'download';
+            $button->href = "./?downloadImages=true&field={$field->name}&id={$input->get->id}";
+            $button->value = "Download Files";
+            $btn .= "<span style='display:block; position:relative; float:right;' class='InputfieldPageTableButtons'>" . $button->render() . "</span>";
+            $out .= $btn;
+        }
+        
+        $event->return = $out;
+        
+    }
+    
+    public function getModuleConfigInputfields(array $data){
+        $modules = wire("modules");
+        $fields = wire('fields');
+        
+        $defaults = self::getDefaultConfig();
+		$data = array_merge($defaults, $data);
+        
+        $form = new InputfieldWrapper();
+        
+        $field = $modules->get("InputfieldAsmSelect");
+		$field->name = "includeFields";
+		$field->label = __("Fields to enable download button");
+		$field->description = __("Choose the image fields where download button should appear");
+        foreach($fields as $f){
+            if($f->flags & Field::flagSystem) continue;
+            if($f->type == "FieldtypeImage" || $f->type == "FieldtypeFile"){
+                $field->addOption($f->name);
+            }
+        }
+		$field->value = $data['includeFields'];
+		
+		$form->add($field);
+        return $form;
+    }
+    
+}
