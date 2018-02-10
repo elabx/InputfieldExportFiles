@@ -1,12 +1,7 @@
 <?php
 
 class InputfieldExportFiles extends WireData implements Module, ConfigurableModule {
-    
-    static public function getDefaultConfig() {
-        return array(
-            "includeFields" => ''
-        );
-    }
+   
 
     public static function install(){
         $session = wire("session");
@@ -84,10 +79,7 @@ class InputfieldExportFiles extends WireData implements Module, ConfigurableModu
     public function getModuleConfigInputfields(array $data){
         $modules = wire("modules");
         $fields = wire('fields');
-        
-        $defaults = self::getDefaultConfig();
-		$data = array_merge($defaults, $data);
-        
+                
         $form = new InputfieldWrapper();
         
         $field = $modules->get("InputfieldAsmSelect");
