@@ -31,14 +31,16 @@ class InputfieldExportFiles extends WireData implements Module, ConfigurableModu
         $session = wire("session");
         $input = wire("input");
         $page = wire('pages')->get($input->get->id);
-        $name = $page->name;
-        $zip = $config->paths->cache . "${$name}.zip";
+        $field = wire('fields')->get($input->get->field);
+        $name = "{$page->name}_{$field->name}";
+        $time = time();
+        $zip = wire('config')->paths->cache . "{$name}.zip";
         
+        //bd($files);
         if($input->get->downloadImages == "true"){
-            wire("log")->save("custom", "excecuted page edit!");
-            $array = wire('files')->zip($zip,
-                                        $page->get($input->get->field)->explode("filename"),
-                                        array("overwrite" => true)  );
+            $files =  $page->get($input->get->field)->explode("filename");
+            //wire("log")->save("custom", "excecuted page edit!");
+            $array = wire('files')->zip($zip, $files, ['overwrite' => true]);
             if(!empty($array["errors"])){
                 foreach($array["errors"] as $error){
                     $this->error($error);
@@ -46,11 +48,12 @@ class InputfieldExportFiles extends WireData implements Module, ConfigurableModu
                 return;
             } else{
                 header('Content-Type: application/zip');
-                header("Content-Disposition: attachment; filename='{$name}.zip'");
+                header("Content-Disposition: attachment; filename={$name}.zip");
                 echo readfile($zip);
-                return $this->halt();
+                unlink($zip);
+                exit(0);
+                //return $this->halt();
             }
-            
         }
     }
     
@@ -58,18 +61,22 @@ class InputfieldExportFiles extends WireData implements Module, ConfigurableModu
         $field = $event->object;
         $input = wire("input");
         $configData = wire('modules')->getModuleConfigData($this);
-      
+        bd($field);
         $out = $event->return;
         
-        if(in_array( $field->name, $configData['includeFields'])){
-
-            $button = wire('modules')->get('InputfieldButton');
-            $button->class = $button->class . " ExportFieldImages";
-            $button->icon = 'download';
-            $button->href = "./?downloadImages=true&field={$field->name}&id={$input->get->id}";
-            $button->value = "Download Files";
-            $btn .= "<span style='display:block; position:relative; float:right;' class='InputfieldPageTableButtons'>" . $button->render() . "</span>";
-            $out .= $btn;
+        foreach( $configData['includeFields'] as $field_in_config){
+        
+            $field_name_in_repeater = "{$field_in_config}_repeater";
+            if($field->name == $field_in_config 
+            || strpos($field->name, $field_name_in_repeater) === 0){
+                $button = wire('modules')->get('InputfieldButton');
+                $button->class = $button->class . " ExportFieldImages";
+                $button->icon = 'download';
+                $button->href = "./?downloadImages=true&field={$field->name}&id={$input->get->id}";
+                $button->value = "Download Files";
+                $btn .= "<span style='display:block; position:relative; float:right;' class='InputfieldPageTableButtons'>" . $button->render() . "</span>";
+                $out .= $btn;
+            }
         }
         
         $event->return = $out;
