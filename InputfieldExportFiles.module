@@ -61,7 +61,6 @@ class InputfieldExportFiles extends WireData implements Module, ConfigurableModu
         $field = $event->object;
         $input = wire("input");
         $configData = wire('modules')->getModuleConfigData($this);
-        bd($field);
         $out = $event->return;
         
         foreach( $configData['includeFields'] as $field_in_config){
